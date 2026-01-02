@@ -8,7 +8,6 @@ const elements = {
     uploadArea: document.getElementById('uploadArea'),
     fileInput: document.getElementById('fileInput'),
     status: document.getElementById('status'),
-    generateBtn: document.getElementById('generateBtn'),
     downloadBtn: document.getElementById('downloadBtn'),
     output: document.getElementById('output'),
     svgPreview: document.getElementById('svgPreview'),
@@ -18,7 +17,9 @@ const elements = {
     pxRange: document.getElementById('pxRange'),
     similarityScore: document.getElementById('similarityScore'),
     similarityValue: document.getElementById('similarityValue'),
-    inputLabel: document.getElementById('inputLabel')
+    inputLabel: document.getElementById('inputLabel'),
+    decodedCanvas: document.getElementById('decodedCanvas'),
+    aspectLockBtn: document.getElementById('aspectLockBtn')
 };
 
 // ステータス表示
@@ -72,9 +73,7 @@ async function loadDevSvg() {
         currentSvgData = svgText;
         currentFileName = 'logo';
 
-        // 元のSVGは表示しない。代わりに期待される結果画像（既存PNG）を表示
         displayExpectedPngPreview();
-        elements.generateBtn.disabled = false;
 
         showStatus('テストSVG読み込み完了。MSDF生成中...', 'success');
         // 自動でMSDF生成
@@ -95,9 +94,9 @@ async function loadTestSvg() {
     currentSvgData = testSvg;
     currentFileName = 'arrow-rotate-left-svgrepo-com';
     displaySvgPreview(testSvg);
-    elements.generateBtn.disabled = false;
     
-    showStatus('テストSVG読み込み完了！「MSDF生成」ボタンを押してください。', 'success');
+    showStatus('テストSVG読み込み完了！MSDFを生成します...', 'success');
+    generateMsdfImage();
 }
 
 // ファイル読み込み
@@ -112,7 +111,6 @@ function loadSvgFile(file) {
     reader.onload = (e) => {
         currentSvgData = e.target.result;
         displaySvgPreview(currentSvgData);
-        elements.generateBtn.disabled = false;
         showStatus('SVG読み込み完了！MSDFを生成します...', 'success');
         generateMsdfImage();
     };
@@ -204,7 +202,6 @@ async function generateMsdfImage() {
 
     try {
         showStatus('MSDF生成中...', 'info');
-        elements.generateBtn.disabled = true;
 
         const width = parseInt(elements.width.value);
         const height = parseInt(elements.height.value);
@@ -454,6 +451,9 @@ async function generateMsdfImage() {
             elements.downloadBtn.disabled = false;
             showStatus('MSDF生成完了！🎉', 'success');
             
+            // 復号サンプルを表示
+            decodeMsdf();
+            
             // 一致度の計算
             setTimeout(() => {
                 updateSimilarity();
@@ -469,10 +469,105 @@ async function generateMsdfImage() {
         showStatus('エラー: ' + error.message, 'error');
         console.error('Full error:', error);
     } finally {
-        elements.generateBtn.disabled = false;
+        // 必要に応じて処理を追加
     }
 }
 
+
+
+
+
+// MSDFを復号してサンプル表示（固定サイズで高品質表示）
+function decodeMsdf() {
+    const msdfCanvas = elements.msdfCanvas;
+    const decodedCanvas = elements.decodedCanvas;
+    
+    if (!msdfCanvas.width || !msdfCanvas.height) {
+        return;
+    }
+    
+    const srcWidth = msdfCanvas.width;
+    const srcHeight = msdfCanvas.height;
+    
+    // 固定サイズで復号（MSDFの利点を示すため）
+    const dstSize = 512; // 常に512x512で表示
+    const dstWidth = dstSize;
+    const dstHeight = dstSize;
+    const scale = dstSize / Math.max(srcWidth, srcHeight);
+    
+    // 復号結果のキャンバスを準備
+    decodedCanvas.width = dstWidth;
+    decodedCanvas.height = dstHeight;
+    
+    const msdfCtx = msdfCanvas.getContext('2d', { willReadFrequently: true });
+    const decodedCtx = decodedCanvas.getContext('2d');
+    
+    const msdfData = msdfCtx.getImageData(0, 0, srcWidth, srcHeight);
+    const decodedData = decodedCtx.createImageData(dstWidth, dstHeight);
+    
+    // バイリニア補間でMSDFをサンプリングして2倍サイズに復号
+    for (let y = 0; y < dstHeight; y++) {
+        for (let x = 0; x < dstWidth; x++) {
+            // ソース座標（小数点）
+            const srcX = x / scale;
+            const srcY = y / scale;
+            
+            // バイリニア補間用の4点
+            const x0 = Math.floor(srcX);
+            const y0 = Math.floor(srcY);
+            const x1 = Math.min(x0 + 1, srcWidth - 1);
+            const y1 = Math.min(y0 + 1, srcHeight - 1);
+            
+            const fx = srcX - x0;
+            const fy = srcY - y0;
+            
+            // 4点のピクセルを取得
+            function getPixel(px, py) {
+                const idx = (py * srcWidth + px) * 4;
+                return {
+                    r: msdfData.data[idx] / 255.0,
+                    g: msdfData.data[idx + 1] / 255.0,
+                    b: msdfData.data[idx + 2] / 255.0
+                };
+            }
+            
+            const p00 = getPixel(x0, y0);
+            const p10 = getPixel(x1, y0);
+            const p01 = getPixel(x0, y1);
+            const p11 = getPixel(x1, y1);
+            
+            // バイリニア補間
+            function lerp(a, b, t) {
+                return a + (b - a) * t;
+            }
+            
+            const r = lerp(lerp(p00.r, p10.r, fx), lerp(p01.r, p11.r, fx), fy);
+            const g = lerp(lerp(p00.g, p10.g, fx), lerp(p01.g, p11.g, fx), fy);
+            const b = lerp(lerp(p00.b, p10.b, fx), lerp(p01.b, p11.b, fx), fy);
+            
+            // 中央値を計算
+            const median = Math.max(Math.min(r, g), Math.min(Math.max(r, g), b));
+            
+            const distance = median - 0.5;
+            const pxRange = parseFloat(elements.pxRange.value) || 3;
+            const screenPxDistance = distance * pxRange * scale;
+            
+            // アンチエイリアス: -0.5〜+0.5ピクセルの範囲で滑らかに
+            const opacity = Math.max(0, Math.min(1, screenPxDistance + 0.5));
+            
+            // 白背景に黒い形状を描画（直接RGB値で設定）
+            const value = Math.round(255 * (1 - opacity)); // 0=黒, 255=白
+            
+            const dstIdx = (y * dstWidth + x) * 4;
+            decodedData.data[dstIdx] = value;       // R
+            decodedData.data[dstIdx + 1] = value;   // G
+            decodedData.data[dstIdx + 2] = value;   // B
+            decodedData.data[dstIdx + 3] = 255;     // A (完全不透明)
+        }
+    }
+    
+    decodedCtx.putImageData(decodedData, 0, 0);
+}
 
 
 function downloadMsdf() {
@@ -534,7 +629,48 @@ function setupEventListeners() {
         if (file) loadSvgFile(file);
     });
 
-    elements.generateBtn.addEventListener('click', generateMsdfImage);
+    // 縦横比ロックのロジック
+    let isAspectLocked = true;
+    let aspectRatio = 1.0;
+
+    function updateAspectRatio() {
+        const w = parseInt(elements.width.value);
+        const h = parseInt(elements.height.value);
+        if (w > 0 && h > 0) {
+            aspectRatio = w / h;
+        }
+    }
+
+    elements.aspectLockBtn.addEventListener('click', () => {
+        isAspectLocked = !isAspectLocked;
+        elements.aspectLockBtn.classList.toggle('active', isAspectLocked);
+        elements.aspectLockBtn.querySelector('.lock-icon').textContent = isAspectLocked ? '🔒' : '🔓';
+        if (isAspectLocked) {
+            updateAspectRatio();
+        }
+    });
+
+    elements.width.addEventListener('input', () => {
+        if (isAspectLocked) {
+            const w = parseInt(elements.width.value);
+            if (w > 0) {
+                elements.height.value = Math.round(w / aspectRatio);
+            }
+        }
+        generateMsdfImage();
+    });
+
+    elements.height.addEventListener('input', () => {
+        if (isAspectLocked) {
+            const h = parseInt(elements.height.value);
+            if (h > 0) {
+                elements.width.value = Math.round(h * aspectRatio);
+            }
+        }
+        generateMsdfImage();
+    });
+
+    elements.pxRange.addEventListener('input', generateMsdfImage);
     elements.downloadBtn.addEventListener('click', downloadMsdf);
 }
 
