@@ -1,43 +1,40 @@
 @echo off
-setlocal
+REM Emscripten環境変数設定
+call C:\P\Work\MSDFGenJs\emsdk\emsdk_env.bat
 
-:: This script assumes you have Emscripten (emsdk) installed and in your PATH.
-:: AND you have cloned the original msdfgen repository into the PARENT directory of this tool.
-:: Directory Structure:
-::  /
-::  ├── msdfgen/                   (Original repository)
-::  └── MSDFGen-OnBrowser/         (This repository)
-::      └── src/
-::          └── build.bat          (This script)
+REM すべてのコアファイルを指定
+emcc -o msdfgen.js ^
+  -I../core ^
+  ../core/contour-combiners.cpp ^
+  ../core/Contour.cpp ^
+  ../core/convergent-curve-ordering.cpp ^
+  ../core/DistanceMapping.cpp ^
+  ../core/edge-coloring.cpp ^
+  ../core/edge-segments.cpp ^
+  ../core/edge-selectors.cpp ^
+  ../core/EdgeHolder.cpp ^
+  ../core/equation-solver.cpp ^
+  ../core/export-svg.cpp ^
+  ../core/msdf-error-correction.cpp ^
+  ../core/MSDFErrorCorrection.cpp ^
+  ../core/msdfgen.cpp ^
+  ../core/Projection.cpp ^
+  ../core/rasterization.cpp ^
+  ../core/render-sdf.cpp ^
+  ../core/save-bmp.cpp ^
+  ../core/save-fl32.cpp ^
+  ../core/save-rgba.cpp ^
+  ../core/save-tiff.cpp ^
+  ../core/Scanline.cpp ^
+  ../core/sdf-error-estimation.cpp ^
+  ../core/shape-description.cpp ^
+  ../core/Shape.cpp ^
+  -s WASM=1 ^
+  -s EXPORTED_FUNCTIONS="['_malloc','_free']" ^
+  -s EXPORTED_RUNTIME_METHODS="['ccall','cwrap']" ^
+  -s MODULARIZE=1 ^
+  -s EXPORT_NAME="createMsdfgenModule" ^
+  -s ALLOW_MEMORY_GROWTH=1 ^
+  -O3
 
-set MSDFGEN_PATH=../../msdfgen
-
-if not exist "%MSDFGEN_PATH%/msdfgen.h" (
-    echo [ERROR] msdfgen source not found at %MSDFGEN_PATH%
-    echo Please clone https://github.com/Chlumsky/msdfgen to the parent directory.
-    exit /b 1
-)
-
-echo Building MSDF wrapper for WebAssembly...
-
-:: Compile with optimizations and SIMD support
-call emcc wasm_wrapper.cpp ^
-    %MSDFGEN_PATH%/core/*.cpp ^
-    %MSDFGEN_PATH%/ext/*.cpp ^
-    -I%MSDFGEN_PATH% ^
-    -O3 ^
-    -msimd128 ^
-    -s WASM=1 ^
-    -s EXPORTED_FUNCTIONS="['_generate_msdf_from_svg', '_malloc', '_free']" ^
-    -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'HEAPU8']" ^
-    -s ALLOW_MEMORY_GROWTH=1 ^
-    -s INITIAL_MEMORY=67108864 ^
-    -o ../msdfgen.js
-
-if %ERRORLEVEL% equ 0 (
-    echo [SUCCESS] msdfgen.js and msdfgen.wasm have been updated in the root directory.
-) else (
-    echo [FAILED] Compilation failed.
-)
-
-pause
+echo Build complete!

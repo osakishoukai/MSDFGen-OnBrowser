@@ -172,8 +172,31 @@ int generate_msdf_from_svg(
         Range range_obj(pxRange / min(scale_vec.x, scale_vec.y));
         SDFTransformation transformation(projection, range_obj);
         
-        generateMSDF(msdf, shape, transformation);
+        // 公式ツールと同じ: Skiaなしの場合はoverlapSupport=true
+        MSDFGeneratorConfig generatorConfig;
+        generatorConfig.overlapSupport = true;
+        // scanlinePass中はerrorCorrectionをDISABLEDにする（公式同様）
+        generatorConfig.errorCorrection.mode = ErrorCorrectionConfig::DISABLED;
+        
+        generateMSDF(msdf, shape, transformation, generatorConfig);
         emscripten_console_log("C++: MSDF generation complete");
+        
+        // 公式ツールと同じ: scanlinePass処理
+        // sdfZeroValueを計算
+        float sdfZeroValue = range_obj.lower != range_obj.upper ? 
+            float(range_obj.lower / (range_obj.lower - range_obj.upper)) : 0.5f;
+        
+        // 符号修正（distanceSignCorrection）
+        distanceSignCorrection(msdf, shape, projection, sdfZeroValue, FILL_NONZERO);
+        emscripten_console_log("C++: Distance sign correction complete");
+        
+        // msdfErrorCorrection（scanlinePass後のエラー修正）
+        MSDFGeneratorConfig postErrorCorrectionConfig;
+        postErrorCorrectionConfig.overlapSupport = true;
+        postErrorCorrectionConfig.errorCorrection.distanceCheckMode = ErrorCorrectionConfig::DO_NOT_CHECK_DISTANCE;
+        
+        msdfErrorCorrection(msdf, shape, transformation, postErrorCorrectionConfig);
+        emscripten_console_log("C++: MSDF error correction complete");
         
         // RGBAバッファに変換
         for (int y = 0; y < height; y++) {

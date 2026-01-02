@@ -30,6 +30,11 @@ This repository provides a WebAssembly port for use in web browsers.
 4. Drag and drop an SVG file containing a `<path>` element.
 5. Click "MSDFを生成" (Generate MSDF) and download the result.
 
+## Limitations
+
+- **Single Path Recommended**: For best results, use SVG files with a single `<path>` element. Multiple separate paths may not be processed correctly, matching the behavior of the official `msdfgen` CLI (`-svg` option processes only the last path).
+- To convert multi-path SVGs, use vector editing software (Inkscape, Illustrator) to merge paths before processing.
+
 ## Building from Source
 
 To modify the C++ wrapper or recompile the binaries:
