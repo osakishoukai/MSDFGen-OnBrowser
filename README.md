@@ -17,12 +17,15 @@ This repository provides a WebAssembly port for use in web browsers.
 ## Project Structure
 
 - `index.html`, `app.js`: Web interface and controller logic.
-- `msdfgen.js`, `msdfgen.wasm`: Pre-compiled WebAssembly binaries.
+- `public/msdfgen.js`, `public/msdfgen.wasm`: Pre-compiled WebAssembly binaries.
 - `src/`:
     - `wasm_wrapper.cpp`: C++ bridge for the WASM export.
     - `build.bat`: Build script for the Emscripten compiler.
 
 ## Usage
+
+You can test the latest version online at:
+https://osakishoukai.github.io/MSDFGen-OnBrowser/
 
 1. Clone this repository.
 2. Serve the root directory with any HTTP server (e.g., `npx serve` or `python -m http.server`).
