@@ -1,8 +1,13 @@
 # MSDFGen On Browser
 
-Based on [msdfgen](https://github.com/Chlumsky/msdfgen) by Viktor Chlumský.
 
+
+Based on [msdfgen](https://github.com/Chlumsky/msdfgen) by Viktor Chlumský.
 This repository provides a WebAssembly port for use in web browsers.
+
+<p align="center">
+  <img src="about.webp" alt="MSDFGen-OnBrowser Screenshot" width="600">
+</p>
 
 ## Features
 
